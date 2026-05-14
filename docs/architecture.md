@@ -2,18 +2,41 @@
 
 ## Overview
 
-request2code is a zero-dependency Firefox DevTools extension. There is no build step — files load directly in the browser. The extension is split into two layers:
+request2code is a zero-dependency browser DevTools extension available for Firefox and Chrome. There is no build step — files load directly in the browser.
+
+The codebase is split into two self-contained folders:
+
+| Folder | Browser | Manifest | API namespace |
+|---|---|---|---|
+| `firefox/` | Firefox 142+ | MV2 | `browser.*` |
+| `chrome/` | Chrome (modern) | MV3 | `chrome.*` |
+
+Each folder can be zipped independently for store submission.
+
+## Code split between versions
+
+Three files differ between Firefox and Chrome:
+
+| File | Firefox | Chrome |
+|---|---|---|
+| `manifest.json` | MV2, `browser_specific_settings.gecko`, `__MSG__` name | MV3, no gecko block, hardcoded name |
+| `devtools.js` | `browser.devtools.panels.create` | `chrome.devtools.panels.create` |
+| `panel.js` | `browser.devtools.network.*` | `chrome.devtools.network.*` |
+
+Everything else is identical: `panel.html`, `devtools.html`, and `lib/converters.js`. When editing shared logic, update both `firefox/lib/converters.js` and `chrome/lib/converters.js`.
+
+## Internal layers
 
 - **`lib/converters.js`** — pure functions only. No DOM, no browser APIs. Dual-loadable: `<script>` in the browser and `require()` in Node.js (Jest tests).
-- **`panel.js`** — UI wiring. Uses DOM and `browser.devtools.*` APIs. Not testable in Node.js.
+- **`panel.js`** — UI wiring. Uses DOM and `[browser|chrome].devtools.*` APIs. Not testable in Node.js.
 
-## Entry flow
+## Entry flow (both browsers)
 
 ```
 manifest.json
   └── devtools_page: devtools.html
         └── devtools.js
-              └── browser.devtools.panels.create("request2code", ..., "panel.html")
+              └── [browser|chrome].devtools.panels.create("request2code", ..., "panel.html")
                     └── panel.html
                           ├── <script src="lib/converters.js">
                           └── <script src="panel.js">
@@ -24,7 +47,7 @@ manifest.json
 ## Data flow
 
 ```
-browser.devtools.network.onRequestFinished
+[browser|chrome].devtools.network.onRequestFinished
   └── allRequests.push(entry)         ← HAR entry stored as-is
         └── renderList()              ← rebuilds request list DOM
 
@@ -35,7 +58,7 @@ user clicks a request item
         ├── DOMParser.parseFromString(html, 'text/html')          ← safe parse
         ├── codeEl.replaceChildren(...)                           ← render code tab
         └── renderResponseBody(entry)
-              └── entry.getContent((body, encoding) => ...)       ← async, Firefox API
+              └── entry.getContent((body, encoding) => ...)       ← async, DevTools API
 ```
 
 ## HAR entry shape
@@ -53,8 +76,8 @@ entry = {
     statusText: string,
     content: { mimeType: string },
   },
-  _resourceType: string,        // Firefox-specific, may be undefined
-  getContent: (callback) => {}  // async, Firefox DevTools API
+  _resourceType: string,        // may be undefined in some browsers
+  getContent: (callback) => {}  // async, DevTools API (same shape in both browsers)
 }
 ```
 
@@ -82,13 +105,9 @@ All highlighters are built by `makeHighlighter(commentPrefix, strQuote, rules)`:
 2. For each line: detect and split off any trailing comment.
 3. Extract string literals into numbered placeholders (`\x00S0S\x00`).
 4. HTML-encode the remaining code.
-5. Apply keyword/function/number/variable regex rules (these operate on already-encoded text, so no XSS surface).
+5. Apply keyword/function/number/variable regex rules (operating on already-encoded text — no XSS surface).
 6. Restore string placeholders as `<span class="str">...</span>` (strings were encoded in step 3).
 7. Append comment span if present.
-
-This order ensures that:
-- String contents cannot interfere with regex rules.
-- All user-controlled content is entity-encoded before any span tags are inserted.
 
 ## State
 

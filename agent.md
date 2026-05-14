@@ -1,49 +1,81 @@
 # request2code
 
-Firefox DevTools extension that captures network requests and converts them to executable code snippets. Supports Python, JavaScript (fetch), cURL, PHP, and Go.
+Browser DevTools extension that captures network requests and converts them to executable code snippets. Supports Python, JavaScript (fetch), cURL, PHP, and Go. Available for Firefox and Chrome.
 
-Published at: https://addons.mozilla.org/pt-BR/firefox/addon/request2code/
+Firefox (published): https://addons.mozilla.org/pt-BR/firefox/addon/request2code/
 
 ## What it does
 
-1. Hooks into `browser.devtools.network.onRequestFinished` to intercept all HTTP traffic while DevTools is open.
+1. Hooks into the browser's DevTools network API to intercept all HTTP traffic while DevTools is open.
 2. Parses each HAR entry and converts it to code (headers, cookies, body, method) for the selected language.
 3. Displays the generated code with syntax highlighting in a split-panel DevTools tab.
 4. Shows the response body in three modes: formatted JSON, interactive tree, and raw text.
 5. Provides one-click copy for both the generated code and the response body.
 
-## File structure
+## Repository structure
 
 ```
 request2code/
-├── manifest.json        # WebExtension manifest (MV2, gecko-only)
-├── devtools.html        # Entry point required by manifest's devtools_page key
-├── devtools.js          # Registers the DevTools panel via browser.devtools.panels.create
-├── panel.html           # Full UI — layout, CSS variables, tab structure (~490 lines)
-├── panel.js             # UI logic — JSON tree, tabs, resize, event wiring (~405 lines)
-├── lib/
-│   └── converters.js    # Pure functions: i18n, all HAR converters, syntax highlighters,
-│                        # getResourceType, converters registry (~495 lines)
-├── test/
-│   ├── converters.test.js
-│   ├── highlight.test.js
-│   └── i18n.test.js
+├── firefox/               # Firefox extension (MV2, browser.* API)
+│   ├── manifest.json      # gecko-only settings, default_locale, strict_min_version
+│   ├── devtools.html      # Entry point required by manifest's devtools_page key
+│   ├── devtools.js        # browser.devtools.panels.create(...)
+│   ├── panel.html         # Full UI — layout, CSS variables, tab structure
+│   ├── panel.js           # UI logic — uses browser.devtools.network.*
+│   ├── lib/
+│   │   └── converters.js  # Pure functions: i18n, converters, highlighters
+│   ├── _locales/          # __MSG_extName__ / __MSG_extDescription__ strings
+│   │   ├── en/
+│   │   ├── es/
+│   │   ├── pt/
+│   │   └── pt_BR/
+│   └── test/
+│       ├── converters.test.js
+│       ├── highlight.test.js
+│       └── i18n.test.js
+├── chrome/                # Chrome extension (MV3, chrome.* API)
+│   ├── manifest.json      # manifest_version: 3, no browser_specific_settings
+│   ├── devtools.html      # identical to firefox/devtools.html
+│   ├── devtools.js        # chrome.devtools.panels.create(...)
+│   ├── panel.html         # identical to firefox/panel.html
+│   ├── panel.js           # same as firefox/panel.js — uses chrome.devtools.network.*
+│   └── lib/
+│       └── converters.js  # identical copy of firefox/lib/converters.js
 └── docs/
     ├── architecture.md
     └── adding-converters.md
 ```
 
-No build step, no runtime dependencies, no bundler. The extension loads directly in Firefox.
+Each folder is self-contained and can be zipped independently for store submission.
+
+No build step, no runtime dependencies, no bundler.
+
+## Differences between Firefox and Chrome versions
+
+| | Firefox | Chrome |
+|---|---|---|
+| Manifest version | 2 | 3 |
+| API namespace | `browser.*` | `chrome.*` |
+| Browser settings | `browser_specific_settings.gecko` | none |
+| Extension name/desc | `__MSG_*__` via `_locales/` | hardcoded in manifest |
+| Min version | Firefox 142.0 | any modern Chrome |
+
+Only three files differ between the two versions:
+- `manifest.json`
+- `devtools.js` — `browser.*` vs `chrome.*`
+- `panel.js` — `browser.devtools.network.*` vs `chrome.devtools.network.*`
+
+`lib/converters.js`, `panel.html`, and `devtools.html` are identical. When changing shared logic, update both copies.
 
 ## Architecture
 
-### Entry flow
+### Entry flow (both browsers)
 
 ```
 manifest.json
   └── devtools_page: devtools.html
         └── devtools.js
-              └── browser.devtools.panels.create("request2code", ..., "panel.html")
+              └── [browser|chrome].devtools.panels.create("request2code", ..., "panel.html")
                     └── panel.html
                           ├── <script src="lib/converters.js">   ← pure functions
                           └── <script src="panel.js">            ← UI wiring
@@ -83,7 +115,7 @@ manifest.json
 3. `multipart/form-data` → `files=` dict
 4. Everything else → `data=` raw string
 
-**`makeHighlighter(commentPrefix, strQuote, rules)`** — factory used by all language highlighters. Strings are extracted to placeholders before code rules run, preventing rules from matching quote characters inside span class attributes. HTML-encodes content before injecting span tags (XSS-safe).
+**`makeHighlighter(commentPrefix, strQuote, rules)`** — factory used by all language highlighters. Strings are extracted to placeholders before code rules run. HTML-encodes content before injecting span tags (XSS-safe).
 
 **`converters`** — registry object keyed by `<select id="lang-select">` option values:
 ```js
@@ -91,48 +123,49 @@ manifest.json
 // each: { label, convert, highlight }
 ```
 
-**`buildNode(value, key)`** — recursive DOM builder for the JSON tree viewer. Uses only DOM APIs (`textContent`, `append`) — no innerHTML.
-
 **`selectRequest(i)`** — calls `converters[selectedLang].convert(entry, currentLang)` then `highlight(code)`, renders via `DOMParser` into `codeEl`.
 
 ## Security notes
 
 All dynamic content uses DOM APIs (`textContent`, `append`, `replaceChildren`). The only `innerHTML`-equivalent path is `codeEl` via `DOMParser.parseFromString(highlight(code), 'text/html')`, which is safe because `makeHighlighter` HTML-encodes the source string before inserting span tags.
 
-Network data (`statusText`, MIME type, response body) is never interpolated into HTML strings.
-
 ## i18n
 
 Three locales: `pt_br`, `en`, `es`. Detected from `navigator.language` at startup, overridable via the UI selector. The `t(key)` helper reads from `i18n[currentLang]`. Elements with `data-i18n` / `data-i18n-ph` attributes are translated by `applyTranslations()`.
 
+Firefox also uses `_locales/` for the extension name and description shown in the browser UI (`__MSG_extName__`, `__MSG_extDescription__`). The Chrome version uses hardcoded strings in `manifest.json`.
+
 ## Adding a new target language
 
-See [docs/adding-converters.md](docs/adding-converters.md).
-
-## Manifest notes
-
-- Uses **Manifest V2** (MV3 DevTools panels are not yet fully supported in Firefox).
-- `browser_specific_settings.gecko.data_collection_permissions` is set to empty `required`/`optional` arrays.
-- Minimum Firefox version: **142.0**.
+See [docs/adding-converters.md](docs/adding-converters.md). Changes must be applied to both `firefox/lib/converters.js` and `chrome/lib/converters.js`.
 
 ## Development workflow
 
-Load as a temporary extension:
-
+### Firefox
 ```
-about:debugging → This Firefox → Load Temporary Add-on → select manifest.json
+about:debugging → This Firefox → Load Temporary Add-on → select firefox/manifest.json
 ```
 
-Changes to `panel.js` or `panel.html` take effect after closing and reopening the DevTools panel. Changes to `manifest.json` or `devtools.js` require reloading the extension from `about:debugging`.
+### Chrome
+```
+chrome://extensions → enable Developer mode → Load unpacked → select chrome/ folder
+```
 
-Run tests:
+### After changes
+- `panel.js` / `panel.html`: close and reopen the DevTools panel
+- `manifest.json` / `devtools.js`: reload the extension from the browser's extensions page
 
+### Tests
 ```bash
 npm test
 ```
+Tests live in `firefox/test/` and import from `firefox/lib/converters.js`. The Jest glob `**/test/**/*.test.js` in `package.json` finds them automatically.
 
-Lint before submitting to AMO:
+### Publishing
 
+**Firefox (AMO):**
 ```bash
-npx web-ext lint
+cd firefox && npx web-ext lint && npx web-ext build
 ```
+
+**Chrome (CWS):** zip the `chrome/` folder and submit via the Chrome Developer Dashboard.

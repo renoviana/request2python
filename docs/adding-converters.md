@@ -1,6 +1,8 @@
 # Adding a new target language
 
-All converter logic lives in `lib/converters.js`. Adding a new language requires four steps — no changes to `panel.js` needed beyond the HTML selector.
+All converter logic lives in `lib/converters.js`. Because the project has two self-contained extension folders, changes must be applied to **both** `firefox/lib/converters.js` and `chrome/lib/converters.js`.
+
+Adding a new language requires four steps — no changes to `panel.js` are needed beyond the HTML selector.
 
 ## 1. Write a string-escaping helper
 
@@ -71,18 +73,14 @@ Parameters:
 
 Available CSS classes: `kw` (keyword), `fn` (function/builtin), `str` (string — auto-applied), `num` (number), `cm` (comment — auto-applied), `var` (variable).
 
-## 4. Register the converter
+## 4. Register the converter and add the HTML option
 
 Add an entry to the `converters` object at the bottom of `lib/converters.js`:
 
 ```js
 const converters = {
-  python:   { label: 'Python',     convert: harToPython, highlight: highlightPython },
-  js_fetch: { label: 'JS (fetch)', convert: harToFetch,  highlight: highlightJS     },
-  curl:     { label: 'cURL',       convert: harToCurl,   highlight: highlightCurl   },
-  php:      { label: 'PHP',        convert: harToPhp,    highlight: highlightPhp    },
-  go:       { label: 'Go',         convert: harToGo,     highlight: highlightGo     },
-  rust:     { label: 'Rust',       convert: harToRust,   highlight: highlightRust   }, // new
+  // existing entries...
+  rust: { label: 'Rust', convert: harToRust, highlight: highlightRust },
 };
 ```
 
@@ -90,12 +88,8 @@ Add the option to the `<select id="lang-select">` in `panel.html`:
 
 ```html
 <select id="lang-select">
-  <option value="python">Python</option>
-  <option value="js_fetch">JS (fetch)</option>
-  <option value="curl">cURL</option>
-  <option value="php">PHP</option>
-  <option value="go">Go</option>
-  <option value="rust">Rust</option>  <!-- new -->
+  <!-- existing options... -->
+  <option value="rust">Rust</option>
 </select>
 ```
 
@@ -110,9 +104,15 @@ if (typeof module !== 'undefined') {
 }
 ```
 
-## 5. Add tests
+## 5. Apply to both versions
 
-Create or extend a test file in `test/`. Follow the pattern in `test/converters.test.js`:
+Repeat steps 1–4 in both:
+- `firefox/lib/converters.js` and `firefox/panel.html`
+- `chrome/lib/converters.js` and `chrome/panel.html`
+
+## 6. Add tests
+
+Create or extend a test file in `firefox/test/`. Follow the pattern in `firefox/test/converters.test.js`:
 
 ```js
 const { rustStr, harToRust } = require('../lib/converters');

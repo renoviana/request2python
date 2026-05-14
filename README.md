@@ -1,9 +1,13 @@
 # request2code
 
-Extensão Firefox DevTools que captura requisições de rede e as converte em snippets de código prontos para executar.
+Extensão de navegador para DevTools que captura requisições de rede e as converte em snippets de código prontos para executar. Disponível para Firefox e Chrome.
 
-**Disponível na Mozilla Add-ons Store:**
-[https://addons.mozilla.org/pt-BR/firefox/addon/request2code/](https://addons.mozilla.org/pt-BR/firefox/addon/request2code/)
+## Instalar
+
+**Firefox** — Mozilla Add-ons Store:
+[addons.mozilla.org/pt-BR/firefox/addon/request2code/](https://addons.mozilla.org/pt-BR/firefox/addon/request2code/)
+
+**Chrome** — em breve na Chrome Web Store. Por enquanto, carregue manualmente (veja abaixo).
 
 ## Funcionalidades
 
@@ -23,62 +27,89 @@ Extensão Firefox DevTools que captura requisições de rede e as converte em sn
 - Preserve log (mantém requisições ao navegar para outra página)
 - Interface em português, inglês e espanhol
 
-## Instalação
-
-Instale diretamente pelo Firefox:
-[addons.mozilla.org/pt-BR/firefox/addon/request2code/](https://addons.mozilla.org/pt-BR/firefox/addon/request2code/)
-
-Ou carregue temporariamente para desenvolvimento:
-
-```
-about:debugging → This Firefox → Load Temporary Add-on → selecionar manifest.json
-```
-
-## Desenvolvimento
-
-Sem build step, sem bundler, sem dependências de runtime. O código carrega diretamente no Firefox.
-
-### Estrutura
+## Estrutura do repositório
 
 ```
 request2code/
-├── manifest.json        # WebExtension manifest (MV2, gecko-only)
-├── devtools.html        # Entry point exigido pela chave devtools_page
-├── devtools.js          # Registra o painel via browser.devtools.panels.create
-├── panel.html           # UI completa — layout, CSS variables, estrutura de abas
-├── panel.js             # Lógica de UI — JSON tree, tabs, resize, event wiring
-├── lib/
-│   └── converters.js    # Funções puras: i18n, conversores, highlighters
-└── test/
-    ├── converters.test.js
-    ├── highlight.test.js
-    └── i18n.test.js
+├── firefox/             # Extensão para Firefox (MV2, browser.* API)
+│   ├── manifest.json
+│   ├── devtools.html
+│   ├── devtools.js
+│   ├── panel.html
+│   ├── panel.js
+│   ├── lib/
+│   │   └── converters.js
+│   ├── _locales/
+│   └── test/
+├── chrome/              # Extensão para Chrome (MV3, chrome.* API)
+│   ├── manifest.json
+│   ├── devtools.html
+│   ├── devtools.js
+│   ├── panel.html
+│   ├── panel.js
+│   └── lib/
+│       └── converters.js
+└── docs/
+    ├── architecture.md
+    └── adding-converters.md
 ```
 
-### Testes
+Cada pasta é self-contained e pode ser empacotada independentemente para submissão às lojas.
 
-```bash
-npm test
+## Desenvolvimento
+
+Sem build step, sem bundler, sem dependências de runtime. O código carrega diretamente no navegador.
+
+### Carregar no Firefox (temporário)
+
+```
+about:debugging → This Firefox → Load Temporary Add-on → selecionar firefox/manifest.json
 ```
 
-Usa Jest. Cobertura dos conversores, syntax highlighters e strings de i18n.
+### Carregar no Chrome (temporário)
+
+```
+chrome://extensions → ativar "Modo desenvolvedor" → "Carregar sem compactação" → selecionar a pasta chrome/
+```
 
 ### Recarregar após mudanças
 
 | Arquivo alterado | O que fazer |
 |---|---|
 | `panel.js` / `panel.html` | Fechar e reabrir o painel DevTools |
-| `manifest.json` / `devtools.js` | Recarregar a extensão em `about:debugging` |
+| `manifest.json` / `devtools.js` | Firefox: recarregar em `about:debugging` / Chrome: botão reload em `chrome://extensions` |
+
+### Testes
+
+Os testes cobrem `lib/converters.js` — funções puras sem dependência de browser API.
+
+```bash
+npm test
+```
+
+Usa Jest. Os arquivos de teste ficam em `firefox/test/` e importam `firefox/lib/converters.js`.
+
+### Sincronizar mudanças entre versões
+
+`lib/converters.js` é duplicado em `firefox/lib/` e `chrome/lib/`. Qualquer mudança nos conversores ou no i18n precisa ser aplicada nos dois arquivos.
+
+A única diferença entre as versões está em:
+- `manifest.json` — versão de manifest, browser-specific settings
+- `devtools.js` — `browser.*` (Firefox) vs `chrome.*` (Chrome)
+- `panel.js` — `browser.devtools.network.*` (Firefox) vs `chrome.devtools.network.*` (Chrome)
 
 ### Adicionar uma nova linguagem
 
 Veja [docs/adding-converters.md](docs/adding-converters.md).
 
-### Publicar no AMO
+### Publicar
 
+**Firefox (AMO):**
 ```bash
+cd firefox
 npx web-ext lint
 npx web-ext build
 ```
 
-Envie o `.zip` gerado em `web-ext-artifacts/` para [addons.mozilla.org](https://addons.mozilla.org).
+**Chrome (CWS):**
+Compacte a pasta `chrome/` como `.zip` e envie pelo Chrome Developer Dashboard.
