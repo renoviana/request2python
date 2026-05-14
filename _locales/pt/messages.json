@@ -1,0 +1,8 @@
+{
+  "extName": {
+    "message": "Requests2Code"
+  },
+  "extDescription": {
+    "message": "Converta requisições de rede em código Python, JS, cURL, PHP ou Go diretamente pelo painel Network do DevTools."
+  }
+}

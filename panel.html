@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #1e1e1e;
+      --bg2: #252526;
+      --bg3: #2d2d2d;
+      --border: #3c3c3c;
+      --text: #d4d4d4;
+      --text-muted: #858585;
+      --accent: #0e639c;
+      --selected: #094771;
+      --hover: #2a2d2e;
+      --code-bg: #1e1e1e;
+      --font-mono: 'Cascadia Code', 'Fira Code', Consolas, 'Courier New', monospace;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 12px;
+      overflow: hidden;
+    }
+
+    #toolbar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 8px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    #filter {
+      flex: 1;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--text);
+      padding: 3px 7px;
+      font-size: 12px;
+      outline: none;
+    }
+
+    #filter:focus { border-color: var(--accent); }
+    #filter::placeholder { color: var(--text-muted); }
+
+    #preserve-label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+    }
+    #preserve-label:hover { color: var(--text); }
+    #preserve-log { cursor: pointer; accent-color: var(--accent); }
+
+    .count {
+      color: var(--text-muted);
+      white-space: nowrap;
+      min-width: 60px;
+    }
+
+    button {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--text);
+      padding: 3px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    button:hover { background: var(--hover); border-color: #555; }
+    button:active { background: var(--selected); }
+    button.success { color: #4ec94e; border-color: #4ec94e; }
+
+    #main {
+      display: flex;
+      height: calc(100vh - 33px);
+      overflow: hidden;
+    }
+
+    #request-list-wrapper {
+      width: 340px;
+      min-width: 180px;
+      max-width: 60%;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    #request-list {
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .request-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      cursor: pointer;
+      border-bottom: 1px solid var(--border);
+      min-height: 26px;
+    }
+
+    .request-item:hover { background: var(--hover); }
+    .request-item.selected { background: var(--selected); }
+
+    .method-badge {
+      font-size: 10px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      padding: 1px 4px;
+      border-radius: 2px;
+      flex-shrink: 0;
+      min-width: 40px;
+      text-align: center;
+    }
+
+    .method-get    { background: #1a3a1a; color: #4ec94e; }
+    .method-post   { background: #1a2a3a; color: #4eaaec; }
+    .method-put    { background: #3a2a1a; color: #e8a04e; }
+    .method-patch  { background: #2a1a3a; color: #c47ee8; }
+    .method-delete { background: #3a1a1a; color: #e84e4e; }
+    .method-other  { background: #2a2a2a; color: #aaa; }
+
+    .request-url {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+
+    #code-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--code-bg);
+    }
+
+    #tabs {
+      display: flex;
+      align-items: center;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      padding: 0 4px;
+      gap: 0;
+    }
+
+    .tab {
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      border-radius: 0;
+      color: var(--text-muted);
+      padding: 6px 14px;
+      font-size: 12px;
+      cursor: pointer;
+      margin-bottom: -1px;
+    }
+
+    .tab:hover { color: var(--text); background: none; }
+    .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+
+    .tab-spacer { flex: 1; }
+
+    #copy-btn { margin: 3px 0; }
+
+    #ui-lang {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--text-muted);
+      padding: 3px 4px;
+      font-size: 11px;
+      cursor: pointer;
+      outline: none;
+    }
+    #ui-lang:focus { border-color: var(--accent); }
+
+    #lang-select {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--text);
+      padding: 3px 6px;
+      font-size: 12px;
+      cursor: pointer;
+      outline: none;
+      margin: 3px 0;
+    }
+    #lang-select:focus { border-color: var(--accent); }
+
+    .tab-content {
+      flex: 1;
+      overflow: auto;
+      display: none;
+    }
+
+    .tab-content.active { display: flex; flex-direction: column; }
+
+    #code-area {
+      flex: 1;
+      overflow: auto;
+      padding: 12px 16px;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      line-height: 1.6;
+      white-space: pre;
+      color: var(--text);
+      background: var(--code-bg);
+      margin: 0;
+    }
+
+    #response-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #response-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px 6px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg2);
+      flex-shrink: 0;
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+
+    #response-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .status-badge {
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+
+    .status-2xx { background: #1a3a1a; color: #4ec94e; }
+    .status-3xx { background: #1a2a3a; color: #4eaaec; }
+    .status-4xx { background: #3a2a1a; color: #e8a04e; }
+    .status-5xx { background: #3a1a1a; color: #e84e4e; }
+    .status-xxx { background: #2a2a2a; color: #aaa; }
+
+    .response-mime { color: var(--text-muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    #response-controls {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .view-btns {
+      display: flex;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .view-btn {
+      background: var(--bg3);
+      border: none;
+      border-radius: 0;
+      border-right: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 2px 9px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .view-btn:last-child { border-right: none; }
+    .view-btn:hover { background: var(--hover); color: var(--text); }
+    .view-btn.active { background: var(--accent); color: #fff; }
+
+    #copy-response-btn { font-size: 11px; padding: 2px 9px; }
+
+    #response-body {
+      flex: 1;
+      overflow: auto;
+      padding: 12px 16px;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      line-height: 1.6;
+      white-space: pre;
+      color: var(--text);
+      margin: 0;
+    }
+
+    #response-tree {
+      flex: 1;
+      overflow: auto;
+      padding: 10px 14px;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      line-height: 1.7;
+      display: none;
+    }
+
+    .jt-row { position: relative; }
+
+    .jt-children {
+      padding-left: 16px;
+      border-left: 1px solid var(--border);
+      margin-left: 7px;
+    }
+
+    .jt-header { display: flex; align-items: baseline; flex-wrap: nowrap; }
+
+    .jt-toggle {
+      cursor: pointer;
+      color: var(--text-muted);
+      width: 14px;
+      flex-shrink: 0;
+      user-select: none;
+      font-size: 10px;
+      line-height: 1.7;
+    }
+
+    .jt-toggle:hover { color: var(--text); }
+
+    .jt-key   { color: #9cdcfe; }
+    .jt-colon { color: var(--text-muted); margin-right: 4px; }
+    .jt-bracket { color: #888; }
+    .jt-summary { color: var(--text-muted); font-style: italic; font-size: 11px; margin-left: 4px; }
+    .jt-str  { color: #ce9178; }
+    .jt-num  { color: #b5cea8; }
+    .jt-bool { color: #569cd6; }
+    .jt-null { color: #569cd6; }
+    .jt-footer { color: #888; }
+
+    #placeholder {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      gap: 8px;
+    }
+
+    #placeholder .icon { font-size: 32px; }
+
+    /* Syntax highlighting */
+    .kw  { color: #569cd6; }
+    .fn  { color: #dcdcaa; }
+    .str { color: #ce9178; }
+    .num { color: #b5cea8; }
+    .cm  { color: #6a9955; }
+    .var { color: #9cdcfe; }
+
+    /* Resizer */
+    #resizer {
+      width: 4px;
+      cursor: col-resize;
+      background: var(--border);
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    #resizer:hover, #resizer.dragging { background: var(--accent); }
+
+    #type-filter-bar {
+      display: flex;
+      padding: 3px 5px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg2);
+      flex-shrink: 0;
+      overflow-x: auto;
+      gap: 1px;
+    }
+    #type-filter-bar::-webkit-scrollbar { height: 0; }
+
+    .type-btn {
+      background: none;
+      border: none;
+      border-radius: 3px;
+      color: var(--text-muted);
+      padding: 2px 8px;
+      font-size: 11px;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .type-btn:hover { color: var(--text); background: var(--hover); }
+    .type-btn.active { color: var(--text); background: var(--selected); }
+
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: var(--bg2); }
+    ::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #777; }
+  </style>
+</head>
+<body>
+  <div id="toolbar">
+    <input id="filter" type="text" data-i18n-ph="filterPlaceholder" placeholder="Filtrar por URL...">
+    <label id="preserve-label"><input type="checkbox" id="preserve-log"> <span data-i18n="preserveLog">Manter log</span></label>
+    <span class="count" id="count"></span>
+    <button id="clear-btn" data-i18n="clearBtn">Limpar</button>
+    <select id="ui-lang">
+      <option value="pt_br">PT-BR</option>
+      <option value="en">EN</option>
+      <option value="es">ES</option>
+    </select>
+  </div>
+  <div id="main">
+    <div id="request-list-wrapper">
+      <div id="type-filter-bar">
+        <button class="type-btn active" data-type="all"   data-i18n="typeAll">Tudo</button>
+        <button class="type-btn"        data-type="xhr">XHR/Fetch</button>
+        <button class="type-btn"        data-type="js">JS</button>
+        <button class="type-btn"        data-type="css">CSS</button>
+        <button class="type-btn"        data-type="img">Img</button>
+        <button class="type-btn"        data-type="doc">Doc</button>
+        <button class="type-btn"        data-type="other" data-i18n="typeOther">Outro</button>
+      </div>
+      <div id="request-list"></div>
+    </div>
+    <div id="resizer"></div>
+    <div id="code-container">
+      <div id="tabs">
+        <button class="tab active" data-tab="code"     data-i18n="tabCode">Código</button>
+        <button class="tab"        data-tab="response" data-i18n="tabResponse">Resposta</button>
+        <div class="tab-spacer"></div>
+        <select id="lang-select">
+          <option value="python">Python</option>
+          <option value="js_fetch">JS (fetch)</option>
+          <option value="curl">cURL</option>
+          <option value="php">PHP</option>
+          <option value="go">Go</option>
+        </select>
+        <button id="copy-btn" data-i18n="copyCode">Copiar código</button>
+      </div>
+      <div id="placeholder">
+        <span class="icon">&lt;/&gt;</span>
+        <span data-i18n="placeholderText">Selecione uma requisição para ver o código</span>
+      </div>
+      <div id="tab-code" class="tab-content">
+        <pre id="code-area"></pre>
+      </div>
+      <div id="tab-response" class="tab-content">
+        <div id="response-area">
+          <div id="response-header">
+            <div id="response-status"></div>
+            <div id="response-controls">
+              <div class="view-btns">
+                <button class="view-btn active" data-mode="formatado" data-i18n="viewFormatted">Formatado</button>
+                <button class="view-btn"        data-mode="arvore"    data-i18n="viewTree">Árvore</button>
+                <button class="view-btn"        data-mode="raw">Raw</button>
+              </div>
+              <button id="copy-response-btn" data-i18n="copyResponse">Copiar</button>
+            </div>
+          </div>
+          <pre id="response-body"></pre>
+          <div id="response-tree"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="lib/converters.js"></script>
+  <script src="panel.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "extName": {
+    "message": "Requests2Code"
+  },
+  "extDescription": {
+    "message": "Converta requisições de rede em código Python, JS, cURL, PHP ou Go diretamente pelo painel Network do DevTools."
+  },
+  "name": {
+    "message": "Requests2Code"
+  },
+  "summary": {
+    "message": "Converta requisições de rede capturadas no DevTools em código pronto para usar."
+  },
+  "description": {
+    "message": "Extensão para o Firefox DevTools que intercepta requisições HTTP e gera código executável em Python (requests), JavaScript (fetch), cURL, PHP e Go. Visualize o corpo da resposta em JSON formatado, árvore interativa ou texto bruto, com cópia em um clique."
+  }
+}
